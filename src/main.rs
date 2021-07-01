@@ -24,7 +24,7 @@ impl Config {
 
         let port = match args.value_of("PORT") {
             Some(port) => port,
-            None => "80"
+            None => "8080"
         };
         let port = String::from(port);
 
