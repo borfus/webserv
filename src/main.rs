@@ -5,12 +5,17 @@ use std::{fs, env, process, str};
 use std::path::Path;
 use std::vec::Vec;
 use std::sync::Arc;
+use std::time::SystemTime;
 
 use openssl::ssl::{SslMethod, SslAcceptor, SslStream, SslFiletype};
 
 #[macro_use]
 extern crate clap;
 use clap::ArgMatches;
+
+extern crate chrono;
+use chrono::offset::Utc;
+use chrono::DateTime;
 
 struct Config {
     root: String,
@@ -104,18 +109,18 @@ fn main() {
                     handle_connection(stream);
                 });
             },
-            Err(e) => { eprintln!("Connection failed! {}", e) }
+            Err(e) => { log(format!("Connection failed! {}", e)) }
         }
     }
 
-    println!("Shutting down.");
+    log("Shutting down.");
 }
 
 fn handle_connection(mut stream: SslStream<TcpStream>) {
     let mut buffer = [0; 1024];
     stream.ssl_read(&mut buffer).unwrap();
 
-    println!("{}", String::from_utf8_lossy(&buffer));
+    log(String::from_utf8_lossy(&buffer));
 
     let buffer = String::from_utf8_lossy(&buffer);
     let buffer: Vec<&str> = buffer.split_whitespace().collect();
@@ -124,7 +129,7 @@ fn handle_connection(mut stream: SslStream<TcpStream>) {
     if uri == "/" {
         uri = "/index.html".to_string();
     }
-    println!("{}", uri);
+    log(uri);
 
     let uri = uri.replace("%20", " ");
 
@@ -132,7 +137,6 @@ fn handle_connection(mut stream: SslStream<TcpStream>) {
         Ok(c) => ("HTTP/1.1 200 OK", c),
         Err(_) => ("HTTP/1.1 404 NOT FOUND", fs::read("404.html").unwrap())
     };
-    println!("{}", contents.len());
 
     let response = format!(
         "{}\r\nContent-Length: {}\r\n\r\n",
@@ -145,5 +149,15 @@ fn handle_connection(mut stream: SslStream<TcpStream>) {
 
     stream.write_all(&response[..]).unwrap();
     stream.flush().unwrap();
+}
+
+fn get_time() -> String {
+    let system_time = SystemTime::now();
+    let datetime: DateTime<Utc> = system_time.into();
+    format!("{}", datetime.format("%d/%m/%Y %T"));
+}
+
+fn log(message: String) {
+    println!("{}: {}", get_time(), message);
 }
 
