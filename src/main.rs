@@ -113,14 +113,14 @@ fn main() {
         }
     }
 
-    log("Shutting down.");
+    log("Shutting down.".to_string());
 }
 
 fn handle_connection(mut stream: SslStream<TcpStream>) {
     let mut buffer = [0; 1024];
     stream.ssl_read(&mut buffer).unwrap();
 
-    log(String::from_utf8_lossy(&buffer));
+    log(String::from_utf8_lossy(&buffer).to_string());
 
     let buffer = String::from_utf8_lossy(&buffer);
     let buffer: Vec<&str> = buffer.split_whitespace().collect();
@@ -129,7 +129,7 @@ fn handle_connection(mut stream: SslStream<TcpStream>) {
     if uri == "/" {
         uri = "/index.html".to_string();
     }
-    log(uri);
+    log(String::from(&uri));
 
     let uri = uri.replace("%20", " ");
 
@@ -154,7 +154,7 @@ fn handle_connection(mut stream: SslStream<TcpStream>) {
 fn get_time() -> String {
     let system_time = SystemTime::now();
     let datetime: DateTime<Utc> = system_time.into();
-    format!("{}", datetime.format("%d/%m/%Y %T"));
+    format!("{}", datetime.format("%d/%m/%Y %T"))
 }
 
 fn log(message: String) {
