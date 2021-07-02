@@ -1,13 +1,13 @@
 use webserv::ThreadPool;
 use std::io::prelude::*;
-use std::net::{TcpListener, TcpStream};
+use std::net::{TcpListener};
 use std::{fs, env, process, str};
 use std::path::Path;
 use std::vec::Vec;
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use openssl::ssl::{SslMethod, SslAcceptor, SslStream, SslFiletype};
+use openssl::ssl::{SslMethod, SslAcceptor, SslFiletype};
 
 #[macro_use]
 extern crate clap;
@@ -92,9 +92,11 @@ fn main() {
     }
 
     let mut acceptor = SslAcceptor::mozilla_intermediate_v5(SslMethod::tls()).unwrap();
-    acceptor.set_private_key_file(key_string, SslFiletype::PEM).unwrap();
-    acceptor.set_certificate_chain_file(cert_string).unwrap();
-    acceptor.check_private_key().unwrap();
+    if key_present {
+        acceptor.set_private_key_file(key_string, SslFiletype::PEM).unwrap();
+        acceptor.set_certificate_chain_file(cert_string).unwrap();
+        acceptor.check_private_key().unwrap();
+    }
     let acceptor = Arc::new(acceptor.build());
 
     let listener = TcpListener::bind(format!("0.0.0.0:{}", &config.port[..])).unwrap();
@@ -105,8 +107,12 @@ fn main() {
             Ok(stream) => {
                 let acceptor = acceptor.clone();
                 pool.execute(move || {
-                    let stream = acceptor.accept(stream).unwrap();
-                    handle_connection(stream);
+                    if key_present {
+                        let stream = acceptor.accept(stream).unwrap();
+                        handle_connection(stream);
+                    } else {
+                        handle_connection(stream);
+                    }
                 });
             },
             Err(e) => { log(format!("Connection failed! {}", e)) }
@@ -116,9 +122,12 @@ fn main() {
     log("Shutting down.".to_string());
 }
 
-fn handle_connection(mut stream: SslStream<TcpStream>) {
+fn handle_connection<T>(mut stream: T) 
+    where
+        T: Read + Write
+{
     let mut buffer = [0; 1024];
-    stream.ssl_read(&mut buffer).unwrap();
+    stream.read(&mut buffer).unwrap();
 
     log(String::from_utf8_lossy(&buffer).to_string());
 
