@@ -69,8 +69,6 @@ fn main() {
         process::exit(1);
     });
 
-    let listener = TcpListener::bind(format!("0.0.0.0:{}", &config.port[..])).unwrap();
-
     let root = Path::new(&config.root[..]);
     assert!(env::set_current_dir(&root).is_ok());
 
@@ -88,31 +86,34 @@ fn main() {
         };
     }
 
-    let mut acceptor = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
-    if key_present {
-        acceptor.set_private_key_file(key_string, SslFiletype::PEM).unwrap();
-        acceptor.set_certificate_chain_file(cert_string).unwrap();
-        acceptor.check_private_key().unwrap();
-    }
+    let mut acceptor = SslAcceptor::mozilla_intermediate_v5(SslMethod::tls()).unwrap();
+    acceptor.set_private_key_file(key_string, SslFiletype::PEM).unwrap();
+    acceptor.set_certificate_chain_file(cert_string).unwrap();
+    acceptor.check_private_key().unwrap();
     let acceptor = Arc::new(acceptor.build());
 
-    let pool = ThreadPool::new(5);
-    for stream in listener.incoming() {
-        let stream = stream.unwrap();
+    let listener = TcpListener::bind(format!("0.0.0.0:{}", &config.port[..])).unwrap();
 
-        let acceptor = acceptor.clone();
-        pool.execute(move || {
-            let stream = acceptor.accept(stream).unwrap();
-            handle_connection(stream);
-        });
+    let pool = ThreadPool::new(10);
+    for stream in listener.incoming() {
+        match stream { 
+            Ok(stream) => {
+                let acceptor = acceptor.clone();
+                pool.execute(move || {
+                    let stream = acceptor.accept(stream).unwrap();
+                    handle_connection(stream);
+                });
+            },
+            Err(e) => { eprintln!("Connection failed! {}", e) }
+        }
     }
 
     println!("Shutting down.");
 }
 
 fn handle_connection(mut stream: SslStream<TcpStream>) {
-    let mut buffer = [0; 2048];
-    stream.read(&mut buffer).unwrap();
+    let mut buffer = [0; 1024];
+    stream.ssl_read(&mut buffer).unwrap();
 
     println!("{}", String::from_utf8_lossy(&buffer));
 
@@ -131,6 +132,7 @@ fn handle_connection(mut stream: SslStream<TcpStream>) {
         Ok(c) => ("HTTP/1.1 200 OK", c),
         Err(_) => ("HTTP/1.1 404 NOT FOUND", fs::read("404.html").unwrap())
     };
+    println!("{}", contents.len());
 
     let response = format!(
         "{}\r\nContent-Length: {}\r\n\r\n",
@@ -141,7 +143,7 @@ fn handle_connection(mut stream: SslStream<TcpStream>) {
     let mut response = response.as_bytes().to_vec();
     response.append(&mut contents);
 
-    stream.write(&response[..]).unwrap();
+    stream.write_all(&response[..]).unwrap();
     stream.flush().unwrap();
 }
 
