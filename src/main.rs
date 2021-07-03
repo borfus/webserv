@@ -107,8 +107,8 @@ fn main() {
             Ok(stream) => {
                 if key_present {
                     let acceptor = acceptor.clone();
-                    pool.execute(move || {
-                        let stream = acceptor.accept(stream).unwrap();
+                    let stream = acceptor.accept(stream).unwrap();
+                    pool.execute(|| {
                         handle_connection(stream);
                     });
                 } else {
