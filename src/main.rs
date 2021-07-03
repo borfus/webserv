@@ -105,15 +105,17 @@ fn main() {
     for stream in listener.incoming() {
         match stream { 
             Ok(stream) => {
-                let acceptor = acceptor.clone();
-                pool.execute(move || {
-                    if key_present {
+                if key_present {
+                    let acceptor = acceptor.clone();
+                    pool.execute(move || {
                         let stream = acceptor.accept(stream).unwrap();
                         handle_connection(stream);
-                    } else {
+                    });
+                } else {
+                    pool.execute(|| {
                         handle_connection(stream);
-                    }
-                });
+                    });
+                }
             },
             Err(e) => { log(format!("Connection failed! {}", e)) }
         }
