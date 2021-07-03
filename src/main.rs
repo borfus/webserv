@@ -101,27 +101,29 @@ fn main() {
 
     let listener = TcpListener::bind(format!("0.0.0.0:{}", &config.port[..])).unwrap();
 
-    let pool = ThreadPool::new(10);
-    for stream in listener.incoming() {
-        match stream { 
-            Ok(stream) => {
-                if key_present {
-                    let acceptor = acceptor.clone();
-                    let stream = acceptor.accept(stream).unwrap();
-                    pool.execute(|| {
-                        handle_connection(stream);
-                    });
-                } else {
-                    pool.execute(|| {
-                        handle_connection(stream);
-                    });
-                }
-            },
-            Err(e) => { log(format!("Connection failed! {}", e)) }
+    loop {
+        let pool = ThreadPool::new(10);
+        for stream in listener.incoming() {
+            match stream { 
+                Ok(stream) => {
+                    if key_present {
+                        let acceptor = acceptor.clone();
+                        let stream = acceptor.accept(stream).unwrap();
+                        pool.execute(|| {
+                            handle_connection(stream);
+                        });
+                    } else {
+                        pool.execute(|| {
+                            handle_connection(stream);
+                        });
+                    }
+                },
+                Err(e) => { log(format!("Connection failed! {}", e)) }
+            }
         }
-    }
 
-    log("Shutting down.".to_string());
+        log("Server ended abruptly! Rebuilding thread pool.".to_string());
+    }
 }
 
 fn handle_connection<T>(mut stream: T) 
