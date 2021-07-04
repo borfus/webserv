@@ -101,29 +101,33 @@ fn main() {
 
     let listener = TcpListener::bind(format!("0.0.0.0:{}", &config.port[..])).unwrap();
 
-    loop {
-        let pool = ThreadPool::new(10);
-        for stream in listener.incoming() {
-            match stream { 
-                Ok(stream) => {
-                    if key_present {
-                        let acceptor = acceptor.clone();
-                        let stream = acceptor.accept(stream).unwrap();
-                        pool.execute(|| {
-                            handle_connection(stream);
-                        });
-                    } else {
-                        pool.execute(|| {
-                            handle_connection(stream);
-                        });
-                    }
-                },
-                Err(e) => { log(format!("Connection failed! {}", e)) }
-            }
+    let pool = ThreadPool::new(10);
+    for stream in listener.incoming() {
+        match stream { 
+            Ok(stream) => {
+                if key_present {
+                    let acceptor = acceptor.clone();
+                    let stream = match acceptor.accept(stream) {
+                        Ok(stream) => stream,
+                        Err(_) => { 
+                            log(String::from("Acceptor had trouble creating a stream. Falling back."));
+                            continue;
+                        }
+                    };
+                    pool.execute(|| {
+                        handle_connection(stream);
+                    });
+                } else {
+                    pool.execute(|| {
+                        handle_connection(stream);
+                    });
+                }
+            },
+            Err(e) => { log(format!("Connection failed! {}", e)) }
         }
-
-        log("Server ended abruptly! Rebuilding thread pool.".to_string());
     }
+
+    log("Server ended abruptly! Rebuilding thread pool.".to_string());
 }
 
 fn handle_connection<T>(mut stream: T) 
@@ -131,7 +135,13 @@ fn handle_connection<T>(mut stream: T)
         T: Read + Write
 {
     let mut buffer = [0; 1024];
-    stream.read(&mut buffer).unwrap();
+    match stream.read(&mut buffer) {
+        Ok(read) => read,
+        Err(_) => { 
+            log(String::from("Unable to read buffer to stream!"));
+            return;
+        }
+    };
 
     log(String::from_utf8_lossy(&buffer).to_string());
 
@@ -148,7 +158,13 @@ fn handle_connection<T>(mut stream: T)
 
     let (status_line, mut contents) = match fs::read(&uri[1..]) {
         Ok(c) => ("HTTP/1.1 200 OK", c),
-        Err(_) => ("HTTP/1.1 404 NOT FOUND", fs::read("404.html").unwrap())
+        Err(_) => match fs::read("404.html") {
+            Ok(c) => ("HTTP/1.1 404 NOT FOUND", c),
+            Err(_) => {
+                log(String::from("Unable to read file 404.html!"));
+                return;
+            }
+        }
     };
 
     let response = format!(
@@ -160,8 +176,20 @@ fn handle_connection<T>(mut stream: T)
     let mut response = response.as_bytes().to_vec();
     response.append(&mut contents);
 
-    stream.write_all(&response[..]).unwrap();
-    stream.flush().unwrap();
+    match stream.write_all(&response[..]) {
+        Ok(write) => write,
+        Err(_) => { 
+            log(String::from("Unabled to write all bytes as response to stream!"));
+            return;
+        }
+    }
+    match stream.flush() {
+        Ok(flush) => flush,
+        Err(_) => { 
+            log(String::from("Unable to flush stream after returning bytes in response!"));
+            return;
+        }
+    }
 }
 
 fn get_time() -> String {
