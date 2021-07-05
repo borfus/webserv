@@ -40,6 +40,6 @@ sudo webserv /path/to/html/root -p 443 -c /path/to/ssl/cert -k /path/to/ssl/priv
 webserv /path/to/html/root 
 
 // HINT:
-// If your SSL cert and key follow a similar format to `-----BEGIN PRIVATE KEY-----`, then it is already in the PEM format.
-// Just make a copy of the cert/key file with the `.pem` file extention added to the end.
+// If your SSL cert and key follow a similar format to "-----BEGIN PRIVATE KEY-----", then it is already in the PEM format.
+// Just make a copy of the cert/key file with the ".pem" file extention added to the end.
 ```
