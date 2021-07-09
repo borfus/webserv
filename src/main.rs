@@ -109,8 +109,8 @@ fn main() {
                     let acceptor = acceptor.clone();
                     let stream = match acceptor.accept(stream) {
                         Ok(stream) => stream,
-                        Err(_) => { 
-                            log(String::from("Acceptor had trouble creating a stream. Falling back."));
+                        Err(e) => { 
+                            log(format!("Acceptor had trouble creating a stream. Falling back. {}", e));
                             continue;
                         }
                     };
@@ -137,8 +137,8 @@ fn handle_connection<T>(mut stream: T)
     let mut buffer = [0; 1024];
     match stream.read(&mut buffer) {
         Ok(read) => read,
-        Err(_) => { 
-            log(String::from("Unable to read buffer to stream!"));
+        Err(e) => { 
+            log(format!("Unable to read buffer to stream! {}", e));
             return;
         }
     };
@@ -160,8 +160,8 @@ fn handle_connection<T>(mut stream: T)
         Ok(c) => ("HTTP/1.1 200 OK", c),
         Err(_) => match fs::read("404.html") {
             Ok(c) => ("HTTP/1.1 404 NOT FOUND", c),
-            Err(_) => {
-                log(String::from("Unable to read file 404.html!"));
+            Err(e) => {
+                log(format!("Unable to read file 404.html! {}", e));
                 return;
             }
         }
@@ -178,15 +178,15 @@ fn handle_connection<T>(mut stream: T)
 
     match stream.write_all(&response[..]) {
         Ok(write) => write,
-        Err(_) => { 
-            log(String::from("Unabled to write all bytes as response to stream!"));
+        Err(e) => { 
+            log(format!("Unabled to write all bytes as response to stream! {}", e));
             return;
         }
     }
     match stream.flush() {
         Ok(flush) => flush,
-        Err(_) => { 
-            log(String::from("Unable to flush stream after returning bytes in response!"));
+        Err(e) => { 
+            log(format!("Unable to flush stream after returning bytes in response! {}", e));
             return;
         }
     }
