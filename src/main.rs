@@ -147,6 +147,12 @@ fn handle_connection<T>(mut stream: T)
 
     let buffer = String::from_utf8_lossy(&buffer);
     let buffer: Vec<&str> = buffer.split_whitespace().collect();
+
+    if buffer.len() <= 1 {
+        log(String::from("Buffer is too short to process as HTTP request. Returning..."));
+        return;
+    }
+
     let mut uri = buffer[1].to_string();
 
     if uri == "/" {
