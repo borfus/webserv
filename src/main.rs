@@ -91,16 +91,17 @@ fn main() {
         };
     }
 
-    let mut acceptor = SslAcceptor::mozilla_intermediate_v5(SslMethod::tls()).unwrap();
+    let mut acceptor = SslAcceptor::mozilla_intermediate_v5(SslMethod::tls()).expect("Unable to create SslAcceptor");
     if key_present {
-        acceptor.set_private_key_file(key_string, SslFiletype::PEM).unwrap();
-        acceptor.set_certificate_chain_file(cert_string).unwrap();
-        acceptor.check_private_key().unwrap();
+        acceptor.set_private_key_file(key_string, SslFiletype::PEM).expect("Error occurred while setting private key on acceptor");
+        acceptor.set_certificate_chain_file(cert_string).expect("Error occurred while setting certificate chain file on acceptor");
+        acceptor.check_private_key().expect("Error occurred while checking private key for acceptor");
     }
     let acceptor = Arc::new(acceptor.build());
 
-    let listener = TcpListener::bind(format!("0.0.0.0:{}", &config.port[..])).unwrap();
+    let listener = TcpListener::bind(format!("0.0.0.0:{}", &config.port[..])).expect(format!("Error occurred while binding port {}. Try running as sudo or with admin privileges.", &config.port).as_str());
 
+    // Set up ssl (if port 443) or non-ssl connection stream
     let pool = ThreadPool::new(10);
     for stream in listener.incoming() {
         match stream { 
@@ -134,6 +135,7 @@ fn handle_connection<T>(mut stream: T)
     where
         T: Read + Write
 {
+    // Obtain HTTP request buffer
     let mut buffer = [0; 1024];
     match stream.read(&mut buffer) {
         Ok(read) => read,
@@ -142,9 +144,7 @@ fn handle_connection<T>(mut stream: T)
             return;
         }
     };
-
     log(String::from_utf8_lossy(&buffer).to_string());
-
     let buffer = String::from_utf8_lossy(&buffer);
     let buffer: Vec<&str> = buffer.split_whitespace().collect();
 
@@ -159,9 +159,9 @@ fn handle_connection<T>(mut stream: T)
         uri = "/index.html".to_string();
     }
     log(String::from(&uri));
-
     let uri = uri.replace("%20", " ");
 
+    // Return requested files in HTTP request buffer
     let (status_line, mut contents) = match fs::read(&uri[1..]) {
         Ok(c) => ("HTTP/1.1 200 OK", c),
         Err(_) => match fs::read("404.html") {
@@ -173,12 +173,12 @@ fn handle_connection<T>(mut stream: T)
         }
     };
 
+    // Prepare and send HTTP response from previous request
     let response = format!(
         "{}\r\nContent-Length: {}\r\n\r\n",
         status_line,
         contents.len(),
     );
-
     let mut response = response.as_bytes().to_vec();
     response.append(&mut contents);
 
@@ -198,13 +198,13 @@ fn handle_connection<T>(mut stream: T)
     }
 }
 
+fn log(message: String) {
+    println!("{}: {}", get_time(), message);
+}
+
 fn get_time() -> String {
     let system_time = SystemTime::now();
     let datetime: DateTime<Utc> = system_time.into();
     format!("{}", datetime.format("%d/%m/%Y %T"))
-}
-
-fn log(message: String) {
-    println!("{}: {}", get_time(), message);
 }
 
